@@ -1,0 +1,148 @@
+---
+title: "BDSM Analyses"
+author: "Andy Chan"
+date: "`r Sys.Date()`" 
+output: 
+  html_document: 
+    code_folding: hide 
+    theme: darkly
+    toc: yes
+    toc_depth: 5
+    toc_float: yes
+--- 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(haven)
+library(tidyverse) 
+library(naniar) # missingness
+library(car) # for Anova()
+library(MVN) # Multivariate normality  
+library(QuantPsyc) # Multivariate normality  
+
+library(ggplot2)
+library(GGally)
+library(CCA)
+library(CCP)
+
+# Useful settings
+options(digits = 3)
+options(scipen = 9999) # suppress scientific notation
+
+rm(list = ls()) 
+dat<- readRDS("Final Cleaned Kink.rds")
+dat<-dat%>% dplyr::select(-COMMUNITY_1:-COMMUNITY_6)
+# Get number of missings per variable (n and %)
+miss_var_summary(dat)
+dat <- dat[complete.cases(dat),] #197 cases remain
+
+pred<-dat %>% dplyr::select(Women, Bottom, Switch, Hetero, ASSERT, YOST_Wrong_ln, YOST_V_ln, YOST_LoT, YOST_RL, YR_PRACTICE, YR_COMMUN, COMMUN)
+consent<-dat %>% dplyr::select(ASSUME, POS, PBC_ln, RLN, IBA, AWARE_ln, RCUS_ln, LIKELY_ln)
+
+
+library(openxlsx)
+BDSMResults <- createWorkbook("BDSMResults") 
+```
+Not enough sample size to look at enbys, especially when we do interaction
+
+```{r}
+table(dat$Gender)
+table(dat$BDSMRole)
+table(dat$Gender,dat$BDSMRole)
+```
+
+# CCA
+* Predictors: ASSERT YOST (YOST_Wrong_ln YOST_V_ln YOST_LoT YOST_RL) YR_PRACTICE YR_COMMUN COMMUN  
+* Outcomes: ASSUME POS PBC_ln RLN IBA AWARE_ln RCUS_ln EFFECTIVE_ln LIKELY_ln
+```{r, fig.width=8, fig.height=8}
+
+# ggpairs(pred)
+# ggpairs(consent)
+
+# knitr::kable(matcor(pred, consent), "simple")
+
+```
+
+
+## CC Models
+```{r}
+cc1 <- cc(pred, consent)
+
+# canonical correlations
+(results<-cc1$cor)
+
+addWorksheet(BDSMResults, "canonical corr")
+writeData(BDSMResults, sheet = 1, results) 
+
+# tests of canonical dimensions
+rho <- cc1$cor
+## Define number of observations, number of variables in first set, and number of variables in the second set.
+n <- dim(pred)[1]
+p <- length(pred)
+q <- length(consent)
+
+## Calculate p-values using the F-approximations of different test statistics:
+p.asym(rho, n, p, q, tstat = "Wilks")
+p.asym(rho, n, p, q, tstat = "Hotelling")
+p.asym(rho, n, p, q, tstat = "Pillai")
+p.asym(rho, n, p, q, tstat = "Roy")
+
+results<-p.asym(rho, n, p, q, tstat = "Wilks")
+results<-as.data.frame(results)
+addWorksheet(BDSMResults, "CCA_Wilks")
+writeData(BDSMResults, sheet = 2, results) 
+ 
+# raw canonical coefficients
+(results<-cc1$xcoef[,1:3])
+results<-as.data.frame(results)
+results<-cbind(row.names(results),results)
+addWorksheet(BDSMResults, "Rawcoeffsx")
+writeData(BDSMResults, sheet = 3, results) 
+
+(results<-cc1$ycoef[,1:3])
+results<-as.data.frame(results)
+results<-cbind(row.names(results),results)
+addWorksheet(BDSMResults, "Rawcoeffsy")
+writeData(BDSMResults, sheet = 4, results) 
+
+# compute canonical loadings
+cc2 <- comput(pred, consent, cc1)
+# display canonical loadings
+cc2$corr.X.xscores[,1:3]
+cc2$corr.Y.xscores[,1:3]
+cc2$corr.X.yscores[,1:3]
+cc2$corr.Y.yscores[,1:3] 
+
+results<-as.data.frame(rbind(
+    cc2$corr.X.xscores[,1:3],
+    cc2$corr.Y.xscores[,1:3],
+    cc2$corr.X.yscores[,1:3],
+    cc2$corr.Y.yscores[,1:3]))
+results<-cbind(row.names(results),results)
+addWorksheet(BDSMResults, "loadings")
+writeData(BDSMResults, sheet = 5, results) 
+
+# standardized canonical coefficients diagonal matrix of pred sd's
+s1 <- diag(sqrt(diag(cov(pred))))
+# (results<-s1 %*% cc1$xcoef)
+results<-as.data.frame(s1 %*% cc1$xcoef)
+results<-cbind(row.names(results),results)
+addWorksheet(BDSMResults, "standardized predictor loadings")
+writeData(BDSMResults, sheet = 6, results) 
+
+# standardized canonical coefficients diagonal matrix of consent sd's
+s2 <- diag(sqrt(diag(cov(consent))))
+# (results<-s2 %*% cc1$ycoef)
+results<-as.data.frame(s2 %*% cc1$ycoef)
+results<-cbind(row.names(results),results)
+addWorksheet(BDSMResults, "standardized outcome loadings")
+writeData(BDSMResults, sheet = 7, results) 
+```
+
+https://stats.oarc.ucla.edu/r/dae/canonical-correlation-analysis/
+
+
+```{r}
+# Export
+saveWorkbook(BDSMResults, "Results.xlsx", overwrite = TRUE) 
+```

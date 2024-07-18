@@ -1,0 +1,376 @@
+---
+title: "BDSM Analyses - Commun Variables"
+author: "Andy Chan"
+date: "`r Sys.Date()`" 
+output: 
+  html_document: 
+    code_folding: hide 
+    theme: darkly
+--- 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(haven)
+library(tidyverse) 
+library(naniar) # missingness
+library(car) # for Anova()
+library(MVN) # Multivariate normality  
+library(QuantPsyc) # Multivariate normality  
+library(broom)
+library(ggplot2)
+library(GGally)
+library(CCA)
+library(CCP)
+# library(weights)
+library(openxlsx)
+
+# Useful settings
+options(digits = 6)
+options(scipen = 9999) # suppress scientific notation
+
+# dat<-dat%>% dplyr::select(-COMMUNITY_1:-COMMUNITY_6)
+# Get number of missings per variable (n and %)
+# miss_var_summary(dat)
+# dat <- dat[complete.cases(dat),] #197 cases remain
+# # 
+# pred<-dat %>% dplyr::select(Women, Bottom, Switch, Hetero, ASSERT, YOST_Wrong_ln, YOST_V_ln, YOST_LoT, YOST_RL, YR_PRACTICE, YR_COMMUN, COMMUN)
+# consent<-dat %>% dplyr::select(ASSUME, POS, PBC_ln, RLN, IBA, AWARE_ln, RCUS_ln, LIKELY_ln)
+# library(pacman)
+# pacman::p_load(
+#   here,         # File locator
+#   skimr,        # get overview of data
+#   tidyverse,    # data management + ggplot2 graphics 
+#   gtsummary,    # summary statistics and tests
+#   rstatix,      # summary statistics and statistical tests
+#   janitor,      # adding totals and percents to tables
+#   scales,       # easily convert proportions to percents  
+#   flextable     # converting tables to pretty images
+#   )
+
+library(sjPlot)
+# view_df(dat, show.frq = TRUE, show.prc = TRUE, show.na=T) 
+
+```
+
+
+```{r}
+rm(list = ls()) 
+dat<- readRDS("Final Kink.rds")
+dat<- read_sav('Kink_Final.sav')
+dat<-dat%>% dplyr::select(id, Gender, BDSMRole, Hetero, 
+                          YR_PRACTICE, YR_COMMUN,COMM_Positive, COMM_Communicate, COMM_Growth,
+                          ASSERT, ASSUME, POS, PBC_ln, RLN, IBA, AWARE_ln, RCUS_ln, LIKELY_ln)
+miss_var_summary(dat, order=T)
+dat <- dat[complete.cases(dat),] #215 remain!
+```
+
+# Descriptives
+```{r}
+# skim(dat)
+# describe(dat[30:32])
+hist(dat$COMM_Positive)
+hist(dat$COMM_Communicate)
+hist(dat$COMM_Growth)
+```
+
+
+
+# Stepwise Modeling
+```{r}
+mlm1<-lm(cbind(ASSERT, ASSUME, POS, PBC_ln, RLN, IBA, AWARE_ln, RCUS_ln)  ~ 1, data = dat)
+mlm3 <- update(mlm1, . ~ . + Gender+BDSMRole +Hetero)
+anova(mlm1, mlm3)
+mlm5 <- update(mlm3, . ~ . +YR_PRACTICE+YR_COMMUN)
+anova(mlm3, mlm5)
+mlm6 <- update(mlm5, . ~ . +COMM_Positive +COMM_Communicate+COMM_Growth)
+anova(mlm5, mlm6)
+
+ANOVA<-anova(mlm1,mlm3,mlm5,mlm6)
+ANOVA[3]<-lapply(ANOVA[3], rd, digits=2)
+ANOVA[-1,c(4,5,8)]<-lapply(ANOVA[-1,c(4,5,8)], rd, digits=2)
+ANOVA
+sink("anova.txt");print(ANOVA);sink()
+```
+
+# VIF
+```{r, fig.height=8}
+# ASSERT, ASSUME, POS, PBC_ln, RLN, IBA, AWARE_ln, RCUS_ln, LIKELY_ln
+mlmx<-lm(ASSERT  ~ Gender+BDSMRole +Hetero +YR_PRACTICE+YR_COMMUN +COMM_Positive +COMM_Communicate+COMM_Growth, data = dat)
+vif_values<-vif(mlmx)[,3]
+par(mar = c(2, 10, 2, 2) + 0.1)
+barplot(vif_values, main = paste("ASSERT:","VIF Values"), horiz = T, col = "steelblue", las = 1,xlim=c(0,8))
+abline(v = 5, lwd = 3, lty = 2)
+vif_values
+```
+
+# Coefs
+```{r}
+results<-summary(mlm6)
+coefs<-tidy(mlm6)
+coefs$p.value<-round(coefs$p.value,4)
+
+#std coefs
+mlm<-lm(cbind(scale(ASSERT),scale(ASSUME), scale(POS), scale(PBC_ln), scale(RLN), scale(IBA), scale(AWARE_ln), scale(RCUS_ln)) ~   Gender + BDSMRole+ Hetero + scale(YR_PRACTICE) + scale(YR_COMMUN)+ scale(COMM_Positive) + scale(COMM_Communicate) + scale(COMM_Growth) , data=dat)
+std.coefs<-tidy(mlm)$estimate
+
+std.coefs<-rd(std.coefs, digits=2)
+coefs$estimate<-rd(coefs$estimate, digits=2)
+coefs$std.error<-rd(coefs$std.error, digits=2)
+
+coefs<-cbind(std.coefs=std.coefs, coefs)  %>%
+    mutate(coef=paste(estimate,"(",std.error,")",sep=""),
+           sig = case_when(p.value<.001 ~ "***",
+                           p.value<.01 ~ "**",
+                           p.value<.05 ~ "*",
+                           T~""),
+           beta=paste(std.coefs,sig,sep=""))%>%
+    dplyr::select(response,term,coef,beta)
+
+boop<-coefs %>% pivot_wider(names_from =response, values_from  = c(coef,beta))
+# knitr::kable(boop)
+
+# 
+# boop<-coefs %>%
+#     dplyr::select(response,term,p.value)%>% 
+#     pivot_wider(names_from =response, values_from  = c(p.value))
+# write.csv(boop,"pvalues.csv")
+ 
+table<-cbind("adj.r.squared","f","numdf","dendf")
+for (i in 1:8){
+    table<-rbind(table,
+                 cbind(round(results[[i]]$adj.r.squared,3),
+                       round(results[[i]]$fstatistic[1],3),
+                       round(results[[i]]$fstatistic[2],3),
+                       round(results[[i]]$fstatistic[3],3))
+    )
+}
+colnames(table)<-table[1,]
+table<-table[-1,]
+table<-as.data.frame(table)
+table[,1]<-as.numeric(table[,1])
+table[,2]<-as.numeric(table[,2])
+table[,3]<-as.numeric(table[,3])
+table[,4]<-as.numeric(table[,4])
+table$p <- pf(table[,2],table[,3],table[,4],lower.tail=F)
+
+table<-table %>%
+    mutate(sig= case_when(p<.001 ~ "p<.001",T~paste("p=",round(p,3))),
+            Ftest=paste("F(",numdf,", ", dendf,") = ", f, ", ",sig,sep="")
+    ) %>% dplyr::select(adj.r.squared,Ftest)
+
+table[1]<-lapply(table[1], rd, digits=2)
+
+BDSMResults <- createWorkbook("BDSMResults")
+addWorksheet(BDSMResults, "ANOVAs")
+writeData(BDSMResults, sheet = 1, ANOVA)
+addWorksheet(BDSMResults, "coefficients")
+writeData(BDSMResults, sheet = 2, boop)
+addWorksheet(BDSMResults, "modela")
+writeData(BDSMResults, sheet = 3, table)
+```
+
+# without nonsig
+```{r}
+mlm1<-lm(cbind(ASSERT, ASSUME, PBC_ln,IBA, AWARE_ln, RCUS_ln)  ~ 1, data = dat)
+mlm3 <- update(mlm1, . ~ . +Gender+BDSMRole +Hetero)
+mlm5 <- update(mlm3, . ~ . +YR_PRACTICE+YR_COMMUN)
+mlm6 <- update(mlm5, . ~ . +COMM_Positive +COMM_Communicate+COMM_Growth)
+
+ANOVA<-anova(mlm1,mlm3,mlm5,mlm6)
+ANOVA[3]<-lapply(ANOVA[3], rd, digits=2)
+ANOVA[-1,c(4,5,8)]<-lapply(ANOVA[-1,c(4,5,8)], rd, digits=2)
+
+results<-summary(mlm6)
+coefs<-tidy(mlm6)
+coefs$p.value<-round(coefs$p.value,4)
+
+#std coefs
+mlm<-lm(cbind(scale(ASSERT),scale(ASSUME), scale(PBC_ln),scale(IBA), scale(AWARE_ln), scale(RCUS_ln)) ~   Gender + BDSMRole+ Hetero + scale(YR_PRACTICE) + scale(YR_COMMUN)+ scale(COMM_Positive) + scale(COMM_Communicate) + scale(COMM_Growth) , data=dat)
+std.coefs<-tidy(mlm)$estimate
+
+std.coefs<-rd(std.coefs, digits=2)
+coefs$estimate<-rd(coefs$estimate, digits=2)
+coefs$std.error<-rd(coefs$std.error, digits=2)
+pvals<-coefs %>%dplyr::select(response,term,p.value)%>%pivot_wider(names_from =response, values_from  = c(p.value))
+
+coefs<-cbind(std.coefs=std.coefs, coefs)  %>%
+    mutate(coef=paste(estimate,"(",std.error,")",sep=""),
+           sig = case_when(p.value<.001 ~ "***",
+                           p.value<.01 ~ "**",
+                           p.value<.05 ~ "*",
+                           T~""),
+           beta=paste(std.coefs,sig,sep=""))%>%
+    dplyr::select(response,term,coef,beta)
+boop<-coefs %>% pivot_wider(names_from =response, values_from  = c(coef,beta)) 
+
+
+
+# write.csv(boop,"pvalues.csv")
+
+
+table<-cbind("adj.r.squared","f","numdf","dendf")
+for (i in 1:6){
+    table<-rbind(table,
+                 cbind(round(results[[i]]$adj.r.squared,3),
+                       round(results[[i]]$fstatistic[1],3),
+                       round(results[[i]]$fstatistic[2],3),
+                       round(results[[i]]$fstatistic[3],3))
+    )
+}
+colnames(table)<-table[1,]
+table<-table[-1,]
+table<-as.data.frame(table)
+table[,1]<-as.numeric(table[,1])
+table[,2]<-as.numeric(table[,2])
+table[,3]<-as.numeric(table[,3])
+table[,4]<-as.numeric(table[,4])
+table$p <- pf(table[,2],table[,3],table[,4],lower.tail=F)
+
+table<-table %>%
+    mutate(sig= case_when(p<.001 ~ "p<.001",T~paste("p=",round(p,3))),
+            Ftest=paste("F(",numdf,", ", dendf,") = ", f, ", ",sig,sep="")
+    ) %>% dplyr::select(adj.r.squared,Ftest)
+
+table[1]<-lapply(table[1], rd, digits=4)
+
+# BDSMResults <- createWorkbook("BDSMResults")
+addWorksheet(BDSMResults, "ANOVAsa")
+writeData(BDSMResults, sheet = 4, ANOVA)
+addWorksheet(BDSMResults, "coefficientsa")
+writeData(BDSMResults, sheet = 5, boop)
+addWorksheet(BDSMResults, "pvaluesa")
+writeData(BDSMResults, sheet = 6, pvals)
+addWorksheet(BDSMResults, "modelaa")
+writeData(BDSMResults, sheet = 7, table)
+```
+
+```{r}
+# variables<-dat %>% dplyr::select(ASSERT, ASSUME, POS, PBC_ln, RLN, IBA, AWARE_ln, RCUS_ln, LIKELY_ln,
+#                YR_PRACTICE,YR_COMMUN ,COMM_Positive ,COMM_Communicate,COMM_Growth,YOST_Wrong_ln ,YOST_V_ln ,YOST_LoT ,YOST_RL )
+# 
+# library(apaTables)
+# apa.cor.table(variables)
+# apa.cor.table(variables, show.conf.interval = F, filename="CorTable1.doc")
+```
+
+
+# Likely
+```{r}
+dat<- readRDS("Final Cleaned Kink2.rds")
+dat<-dat %>% rowwise()%>% mutate(COMM_Positive = mean(COMMUNITY_1,COMMUNITY_2, na.rm = TRUE),
+                                 COMM_Communicate = mean(COMMUNITY_3,COMMUNITY_4, na.rm = TRUE),
+                                 COMM_Growth = mean(COMMUNITY_5,COMMUNITY_6, na.rm = TRUE))
+dat<-dat%>% dplyr::select(-COMMUNITY_1:-COMMUNITY_6,-YOST, -Single:-PARTNERS,-AGE_SEX)
+dat <- dat[complete.cases(dat),] #215 remain!
+
+# mlmx<-lm(LIKELY_ln  ~ Gender+BDSMRole +Hetero +YR_PRACTICE+YR_COMMUN +COMM_Positive +COMM_Communicate+COMM_Growth+YOST_Wrong_ln +YOST_V_ln +YOST_LoT +YOST_RL, data = dat)
+# summary(mlmx)
+# vif_values<-vif(mlmx)[,3]
+# barplot(vif_values, main = paste("LIKELY_ln:","VIF Values"), horiz = T, col = "steelblue", las = 1,xlim=c(0,8))
+# abline(v = 5, lwd = 3, lty = 2)
+# 
+# results<-summary(mlmx)
+# coefs<-tidy(mlmx)
+# 
+# #std coefs
+# mlm<-lm(scale(LIKELY_ln) ~   Gender + BDSMRole+ Hetero + scale(YR_PRACTICE) + scale(YR_COMMUN)+ scale(COMM_Positive) + scale(COMM_Communicate) + scale(COMM_Growth) + scale(YOST_Wrong_ln)+ scale(YOST_V_ln) + scale(YOST_LoT) + scale(YOST_RL) , data=dat)
+# std.coefs<-tidy(mlm)$estimate
+# 
+# std.coefs<-rd(std.coefs, digits=2)
+# coefs$estimate<-rd(coefs$estimate, digits=2)
+# coefs$std.error<-rd(coefs$std.error, digits=2)
+# 
+# coefs<-cbind(std.coefs=std.coefs, coefs)  %>%
+#     mutate(coef=paste(estimate,"(",std.error,")",sep=""),
+#            sig = case_when(p.value<.001 ~ "***",
+#                            p.value<.01 ~ "**",
+#                            p.value<.05 ~ "*",
+#                            T~""),
+#            beta=paste(std.coefs,sig,sep=""))%>%
+#     dplyr::select(term,coef,beta)
+# 
+# #long to wide
+# 
+# addWorksheet(BDSMResults, "model9")
+# writeData(BDSMResults, sheet = 7, coefs)
+
+```
+
+# Likely+POS+RLN
+```{r}
+mlm1<-lm(cbind(POS, RLN, LIKELY_ln)  ~ 1, data = dat)
+mlm2 <- update(mlm1, . ~ . + Gender+BDSMRole +Hetero)
+mlm3 <- update(mlm2, . ~ . +YR_PRACTICE+YR_COMMUN)
+mlm4 <- update(mlm3, . ~ . +COMM_Positive +COMM_Communicate+COMM_Growth)
+mlm5 <- update(mlm4, . ~ . +YOST_Wrong_ln +YOST_V_ln +YOST_LoT)
+
+
+ANOVA<-anova(mlm1,mlm2,mlm3,mlm4,mlm5)
+ANOVA[3]<-lapply(ANOVA[3], rd, digits=2)
+ANOVA[-1,c(4,5,8)]<-lapply(ANOVA[-1,c(4,5,8)], rd, digits=2)
+
+
+mlmx<-lm(cbind(LIKELY_ln,POS,RLN)  ~ Gender+BDSMRole +Hetero +YR_PRACTICE+YR_COMMUN +COMM_Positive +COMM_Communicate+COMM_Growth+YOST_Wrong_ln +YOST_V_ln +YOST_LoT +YOST_RL, data = dat)
+summary(mlmx)
+results<-summary(mlmx)
+coefs<-tidy(mlmx)
+coefs$p.value<-round(coefs$p.value,4)
+pvals<-coefs %>%dplyr::select(response,term,p.value)%>%pivot_wider(names_from =response, values_from  = c(p.value))
+
+#std coefs
+mlm<-lm(cbind(scale(LIKELY_ln),scale(POS),scale(RLN)) ~   Gender + BDSMRole+ Hetero + scale(YR_PRACTICE) + scale(YR_COMMUN)+ scale(COMM_Positive) + scale(COMM_Communicate) + scale(COMM_Growth) + scale(YOST_Wrong_ln)+ scale(YOST_V_ln) + scale(YOST_LoT) + scale(YOST_RL) , data=dat)
+std.coefs<-tidy(mlm)$estimate
+
+std.coefs<-rd(std.coefs, digits=2)
+coefs$estimate<-rd(coefs$estimate, digits=2)
+coefs$std.error<-rd(coefs$std.error, digits=2)
+
+coefs<-cbind(std.coefs=std.coefs, coefs)  %>%
+    mutate(coef=paste(estimate,"(",std.error,")",sep=""),
+           sig = case_when(p.value<.001 ~ "***",
+                           p.value<.01 ~ "**",
+                           p.value<.05 ~ "*",
+                           T~""),
+           beta=paste(std.coefs,sig,sep=""))%>%
+    dplyr::select(response,term,coef,beta)
+boop<-coefs %>% pivot_wider(names_from =response, values_from  = c(coef,beta))
+
+#long to wide
+table<-cbind("adj.r.squared","f","numdf","dendf")
+for (i in 1:3){
+    table<-rbind(table,
+                 cbind(round(results[[i]]$adj.r.squared,3),
+                       round(results[[i]]$fstatistic[1],3),
+                       round(results[[i]]$fstatistic[2],3),
+                       round(results[[i]]$fstatistic[3],3))
+    )
+}
+colnames(table)<-table[1,]
+table<-table[-1,]
+table<-as.data.frame(table)
+table[,1]<-as.numeric(table[,1])
+table[,2]<-as.numeric(table[,2])
+table[,3]<-as.numeric(table[,3])
+table[,4]<-as.numeric(table[,4])
+table$p <- pf(table[,2],table[,3],table[,4],lower.tail=F)
+
+table<-table %>%
+    mutate(sig= case_when(p<.001 ~ "p<.001",T~paste("p=",round(p,3))),
+            Ftest=paste("F(",numdf,", ", dendf,") = ", f, ", ",sig,sep="")
+    ) %>% dplyr::select(adj.r.squared,Ftest)
+
+table[1]<-lapply(table[1], rd, digits=4)
+
+addWorksheet(BDSMResults, "ANOVAsb")
+writeData(BDSMResults, sheet = 8, ANOVA)
+addWorksheet(BDSMResults, "coefficientsb")
+writeData(BDSMResults, sheet = 9, boop)
+addWorksheet(BDSMResults, "pvaluesb")
+writeData(BDSMResults, sheet = 10, pvals)
+addWorksheet(BDSMResults, "modelab")
+writeData(BDSMResults, sheet = 11, table)
+```
+
+```{r} 
+saveWorkbook(BDSMResults, "MVR Results_4202024.xlsx", overwrite = TRUE)
+```

@@ -1,0 +1,146 @@
+﻿* Encoding: UTF-8.
+*Univariate regression.
+
+*REGRESSION
+  /MISSING LISTWISE
+  /STATISTICS COEFF OUTS R ANOVA COLLIN TOL CHANGE
+  /CRITERIA=PIN(.05) POUT(.10)
+  /NOORIGIN
+  /DEPENDENT ASSUME
+  /METHOD=ENTER Woman2 Nonbinary2 BDSMrole_2 BDSMrole_3
+  /METHOD=ENTER MMCS ASSERT ASB SC AIV YOST .
+
+ *MASOCH SADE MMCS ASSERT ASB SC AIV YOST AGE AGE_Sex PARTNERS YRS_PRACTICE YRS_COMMUN COMMUN
+       Gen_1 Gen_2 Gen_3 BDSM_1 BDSM_2 BDSM_3 BDSM_4 
+       ASSUME POS PBC_ln RLN IBA AWARE_ln AGGRESS_ln RCUS_ln  EFFECTIVE_ln  LIKELY_ln
+
+
+*Multivariate regression without covariates, Demos only:
+Gender, Age, Age of first sex, partners.
+
+**Models. 
+OUTPUT CLOSE *.
+* YOST COMBINED.
+OUTPUT COMMENT TEXT = "Combined YOST, with Age, Age of first sex, partners, assertiveness as controls.".
+MANOVA ASSUME POS PBC_ln RLN IBA AWARE_ln RCUS_ln EFFECTIVE_ln LIKELY_ln
+WITH  YOST YR_PRACTICE YR_COMMUN COMMUN Woman BDSM_2 BDSM_3
+    AGE AGE_SEX PARTNERS ASSERT.
+* Export Output.
+OUTPUT EXPORT
+  /CONTENTS  EXPORT=VISIBLE  LAYERS=PRINTSETTING  MODELVIEWS=PRINTSETTING
+  /XLSX  DOCUMENTFILE='C:\Users\anthe\Dropbox\Important Stuff\Old Projects\BDSM & Consent\New Analysis 2023\Multivariate Regressions.xlsx'
+     OPERATION=CREATEFILE  SHEET='FULL YOST SEXHISTORY'
+     LOCATION=LASTCOLUMN  NOTESCAPTIONS=NO .
+OUTPUT CLOSE *.
+
+OUTPUT COMMENT TEXT = "Combined YOST, with Age, Age of first sex, partners, assertiveness, s.orientation, race, urban, relationship status and education as controls.".
+MANOVA ASSUME POS PBC_ln RLN IBA AWARE_ln RCUS_ln EFFECTIVE_ln LIKELY_ln
+WITH  YOST YR_PRACTICE YR_COMMUN COMMUN     Woman BDSM_2 BDSM_3
+    AGE AGE_SEX PARTNERS ASSERT Hetero White College Urban Rel_1 Rel_2.  
+* Export Output.
+OUTPUT EXPORT
+  /CONTENTS  EXPORT=VISIBLE  LAYERS=PRINTSETTING  MODELVIEWS=PRINTSETTING
+  /XLSX  DOCUMENTFILE='C:\Users\anthe\Dropbox\Important Stuff\Old Projects\BDSM & Consent\New Analysis 2023\Multivariate Regressions.xlsx'
+     OPERATION=CREATESHEET  SHEET='FULL YOST ALL'
+     LOCATION=LASTCOLUMN  NOTESCAPTIONS=NO.
+OUTPUT CLOSE *.
+
+OUTPUT COMMENT TEXT = "Combined YOST, Only race, urban, relationship status and education as controls".
+MANOVA ASSUME POS PBC_ln RLN IBA AWARE_ln RCUS_ln EFFECTIVE_ln LIKELY_ln
+WITH  YOST YR_PRACTICE YR_COMMUN COMMUN     Woman BDSM_2 BDSM_3
+    Hetero White College Urban Rel_1 Rel_2.
+* Export Output.
+OUTPUT EXPORT
+  /CONTENTS  EXPORT=VISIBLE  LAYERS=PRINTSETTING  MODELVIEWS=PRINTSETTING
+  /XLSX  DOCUMENTFILE='C:\Users\anthe\Dropbox\Important Stuff\Old Projects\BDSM & Consent\New Analysis 2023\Multivariate Regressions.xlsx'
+     OPERATION=CREATESHEET  SHEET='FULL YOST DEMOS'
+     LOCATION=LASTCOLUMN  NOTESCAPTIONS=NO.
+OUTPUT CLOSE *.
+
+
+
+* YOST SUBSCALES.
+OUTPUT COMMENT TEXT = "Using Yost subscales.".
+MANOVA ASSUME POS PBC_ln RLN IBA AWARE_ln RCUS_ln EFFECTIVE_ln LIKELY_ln
+WITH  YOST_Wrong YOST_V YOST_LoT YOST_RL  YR_PRACTICE YR_COMMUN COMMUN     Woman BDSM_2 BDSM_3
+    AGE AGE_SEX PARTNERS ASSERT.
+* Export Output.
+OUTPUT EXPORT
+  /CONTENTS  EXPORT=VISIBLE  LAYERS=PRINTSETTING  MODELVIEWS=PRINTSETTING
+  /XLSX  DOCUMENTFILE='C:\Users\anthe\Dropbox\Important Stuff\Old Projects\BDSM & Consent\New Analysis 2023\Multivariate Regressions.xlsx'
+     OPERATION=CREATESHEET  SHEET='YOST SUBSCALES SEXHISTORY'
+     LOCATION=LASTCOLUMN  NOTESCAPTIONS=NO.
+OUTPUT CLOSE *.
+
+OUTPUT COMMENT TEXT = "Using Yost subscales with Age, Age of first sex, partners,  s.orientation, race, urban, relationship status and education as controls.".
+MANOVA ASSUME POS PBC_ln RLN IBA AWARE_ln RCUS_ln EFFECTIVE_ln LIKELY_ln
+WITH  YOST_Wrong YOST_V YOST_LoT YOST_RL  YR_PRACTICE YR_COMMUN COMMUN         Woman BDSM_2 BDSM_3
+    AGE AGE_SEX PARTNERS ASSERT Hetero White College Urban Rel_1 Rel_2.
+* Export Output.
+OUTPUT EXPORT
+  /CONTENTS  EXPORT=VISIBLE  LAYERS=PRINTSETTING  MODELVIEWS=PRINTSETTING
+  /XLSX  DOCUMENTFILE='C:\Users\anthe\Dropbox\Important Stuff\Old Projects\BDSM & Consent\New Analysis 2023\Multivariate Regressions.xlsx'
+     OPERATION=CREATESHEET  SHEET='YOST SUBSCALES ALL'
+     LOCATION=LASTCOLUMN  NOTESCAPTIONS=NO.
+OUTPUT CLOSE *.
+    
+OUTPUT COMMENT TEXT = "Using Yost subscales. Only race, urban, relationship status and education as controls".
+MANOVA ASSUME POS PBC_ln RLN IBA AWARE_ln RCUS_ln EFFECTIVE_ln LIKELY_ln
+WITH  YOST_Wrong YOST_V YOST_LoT YOST_RL  YR_PRACTICE YR_COMMUN COMMUN     Woman BDSM_2 BDSM_3
+    Hetero White College Urban Rel_1 Rel_2.
+* Export Output.
+OUTPUT EXPORT
+  /CONTENTS  EXPORT=VISIBLE  LAYERS=PRINTSETTING  MODELVIEWS=PRINTSETTING
+  /XLSX  DOCUMENTFILE='C:\Users\anthe\Dropbox\Important Stuff\Old Projects\BDSM & Consent\New Analysis 2023\Multivariate Regressions.xlsx'
+     OPERATION=CREATESHEET  SHEET='YOST SUBSCALES DEMO'
+     LOCATION=LASTCOLUMN  NOTESCAPTIONS=NO.
+OUTPUT CLOSE *.
+
+
+
+* NO YOST.
+OUTPUT COMMENT TEXT = "No Yost.".
+MANOVA ASSUME POS PBC_ln RLN IBA AWARE_ln RCUS_ln EFFECTIVE_ln LIKELY_ln
+WITH  YR_PRACTICE YR_COMMUN COMMUN     Woman BDSM_2 BDSM_3
+    AGE AGE_SEX PARTNERS ASSERT.
+* Export Output.
+OUTPUT EXPORT
+  /CONTENTS  EXPORT=VISIBLE  LAYERS=PRINTSETTING  MODELVIEWS=PRINTSETTING
+  /XLSX  DOCUMENTFILE='C:\Users\anthe\Dropbox\Important Stuff\Old Projects\BDSM & Consent\New Analysis 2023\Multivariate Regressions.xlsx'
+     OPERATION=CREATESHEET  SHEET='NO YOST SEXHISTORY'
+     LOCATION=LASTCOLUMN  NOTESCAPTIONS=NO.
+OUTPUT CLOSE *.
+
+OUTPUT COMMENT TEXT = "No Yost. Age, Age of first sex, partners, s.orientation, race, urban, relationship status and education as controls".
+MANOVA ASSUME POS PBC_ln RLN IBA AWARE_ln RCUS_ln EFFECTIVE_ln LIKELY_ln
+WITH  YR_PRACTICE YR_COMMUN COMMUN     Woman BDSM_2 BDSM_3
+    AGE AGE_SEX PARTNERS ASSERT    Hetero White College Urban Rel_1 Rel_2.
+* Export Output.
+OUTPUT EXPORT
+  /CONTENTS  EXPORT=VISIBLE  LAYERS=PRINTSETTING  MODELVIEWS=PRINTSETTING
+  /XLSX  DOCUMENTFILE='C:\Users\anthe\Dropbox\Important Stuff\Old Projects\BDSM & Consent\New Analysis 2023\Multivariate Regressions.xlsx'
+     OPERATION=CREATESHEET  SHEET='NO YOST ALL'
+     LOCATION=LASTCOLUMN  NOTESCAPTIONS=NO.
+OUTPUT CLOSE *.
+    
+OUTPUT COMMENT TEXT = "No Yost. Only race, urban, relationship status and education as controls".
+MANOVA ASSUME POS PBC_ln RLN IBA AWARE_ln RCUS_ln EFFECTIVE_ln LIKELY_ln
+WITH  YR_PRACTICE YR_COMMUN COMMUN     Woman BDSM_2 BDSM_3
+    Hetero White College Urban Rel_1 Rel_2.
+* Export Output.
+OUTPUT EXPORT
+  /CONTENTS  EXPORT=VISIBLE  LAYERS=PRINTSETTING  MODELVIEWS=PRINTSETTING
+  /XLSX  DOCUMENTFILE='C:\Users\anthe\Dropbox\Important Stuff\Old Projects\BDSM & Consent\New Analysis 2023\Multivariate Regressions.xlsx'
+     OPERATION=CREATESHEET  SHEET='NO YOST DEMO'
+     LOCATION=LASTCOLUMN  NOTESCAPTIONS=NO.
+OUTPUT CLOSE *.
+
+ 
+
+
+
+*CCA.
+MANOVA ASSUME POS PBC_ln RLN IBA AWARE_ln RCUS_ln  EFFECTIVE_ln  LIKELY_ln 
+    WITH YR_PRACTICE YR_COMMUN COMMUN Woman BDSM_2 BDSM_3
+    /PRINT=signif(eigen dim) 
+    /DISCRIM=all alpha(1) .

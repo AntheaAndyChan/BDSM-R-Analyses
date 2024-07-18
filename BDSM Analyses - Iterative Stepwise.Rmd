@@ -1,0 +1,226 @@
+---
+title: "BDSM Analyses"
+author: "Andy Chan"
+date: "`r Sys.Date()`" 
+output: 
+  html_document: 
+    code_folding: hide 
+    theme: darkly
+    toc: yes
+    toc_depth: 5
+    toc_float: yes
+--- 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(haven)
+library(tidyverse) 
+library(naniar) # missingness
+library(car) # for Anova()
+library(MVN)
+
+# Useful settings
+options(digits = 3)
+options(scipen = 9999) # suppress scientific notation
+
+rm(list = ls()) 
+alldat<- readRDS("Final Cleaned Kink.rds")
+alldat<-alldat %>% mutate(Woman = case_when(Gender_2==1~1,
+                                            Gender_1==1~0,
+                                            Gender_3==1~NA_real_))
+alldat2<-alldat%>% dplyr::select(id, Gender_2,Gender_3,BDSM_2, BDSM_3, Hetero:Urban,Rel_1, Rel_2, AGE_SEX, PARTNERS, YR_PRACTICE, YR_COMMUN, COMMUNITY_1:COMMUNITY_6, ASSERT:YOST_RL, COMMUN)#, -BDSM_1, -College, -Urban, -White)
+# # 296 cases, 42 variables
+
+```
+
+# Missingness
+```{r}
+paste("Number of missing data points", n_miss(alldat2))
+paste("Proportion of data missing: ", round(100*prop_miss(alldat2),2), "%",sep="")
+
+# Get number of missings per variable (n and %)
+miss_var_summary(alldat2)
+
+# Get number of missings per participant (n and %)
+miss_case_summary(alldat2)
+miss_case_table(alldat2)
+
+# Which variables contain the most missing variables?
+gg_miss_var(alldat2)
+
+df<-alldat2%>% dplyr::select(-College, -PARTNERS)
+df <- df[complete.cases(df),] #223 cases remain
+df<-df %>% dplyr::mutate(ID = row_number())
+```
+
+# Multivariate Models
+## Mardia's Test of Multivariate Normality
+```{r} 
+#209 cases remain
+pred<-df %>% dplyr::select(ASSERT, YOST_Wrong, YOST_V, YOST_LoT, YOST_RL, YR_PRACTICE, YR_COMMUN, COMMUN)
+consent<-df %>% dplyr::select(ASSUME, POS, PBC, RLN, IBA, AWARE, RCUS, EFFECTIVE_COERCE, LIKELY_COERCE)
+
+# library(QuantPsyc)
+# Multivariate normality of Predictors
+# mult.norm(pred)$mult.test
+mvn(pred, mvnTest="mardia", univariateTest = c("SW"),desc=F,showOutliers = T) 
+# Multivariate normality of Outcomes
+# mult.norm(consent)$mult.test
+mvn(consent, mvnTest="mardia", univariateTest = c("SW"),desc=F,showOutliers = T) 
+```
+https://www.statology.org/multivariate-normality-test-r/
+...Not normal :(
+
+### Removing significant outliers
+```{r}
+dat<-df %>% dplyr::select(ID,Gender_2:YR_COMMUN, ASSERT:COMMUN)
+
+dat$pred.mahal<-mahalanobis(pred, colMeans(pred), cov(pred))
+dat$pred.p <- pchisq(dat$pred.mahal, df=9, lower.tail=FALSE)
+pred.outliers<-dat %>% filter(pred.p<.001) %>% dplyr::select(ID,pred.mahal:pred.p)
+pred.outliers
+dat$out.mahal<-mahalanobis(consent, colMeans(consent), cov(consent))
+dat$out.p <- pchisq(dat$out.mahal, df=8, lower.tail=FALSE)
+out.outliers<-dat %>% filter(out.p<.001) %>% dplyr::select(ID,out.mahal:out.p)
+out.outliers
+
+OutlierIDs<-c(pred.outliers$ID,out.outliers$ID) 
+
+df<-dat %>% filter(!ID %in% OutlierIDs)
+#208 cases remain
+pred<-df %>% dplyr::select(ASSERT, YOST_Wrong, YOST_V, YOST_LoT, YOST_RL, YR_PRACTICE, YR_COMMUN, COMMUN)
+consent<-df %>% dplyr::select(ASSUME, POS, PBC, RLN, IBA, AWARE, RCUS, EFFECTIVE_COERCE, LIKELY_COERCE)
+
+# Multivariate normality of Predictors
+# mult.norm(pred)$mult.test
+mvn(pred, mvnTest="mardia", univariateTest = c("SW"),desc=F)
+# Multivariate normality of Outcomes
+# mult.norm(consent)$mult.test
+mvn(consent, mvnTest="mardia", univariateTest = c("SW"),desc=F)
+```
+https://www.statology.org/mahalanobis-distance-r/
+
+
+### Transformations?
+```{r}
+par(mfrow = c(4, 4))
+par(mar=c(1,1,1,1))
+hist(df$ASSERT)
+hist(df$YOST_Wrong)
+hist(df$YOST_V)
+hist(df$YOST_LoT)
+hist(df$YOST_RL)
+hist(df$YR_PRACTICE)
+hist(df$YR_COMMUN)
+hist(df$COMMUN)
+hist(df$POS)
+hist(df$PBC)
+hist(df$RLN)
+hist(df$IBA)
+hist(df$AWARE)
+hist(df$RCUS)
+hist(df$EFFECTIVE_COERCE)
+hist(df$LIKELY_COERCE) 
+```
+based on the shape of distributions above, ln transform...Yost_wrong, Yost_V, PBC, Aware, RCUS, EFFECTIVE and LIKELY_COERCE
+
+```{r, fig.width=8, fig.height=8}
+dat<-df %>% mutate(YOST_Wrong_ln = log(YOST_Wrong), 
+                   YOST_V_ln = log(YOST_V), 
+                   PBC_ln = log(PBC), 
+                   AWARE_ln = log(AWARE), 
+                   RCUS_ln = log(RCUS), 
+                   EFFECTIVE_ln = log(EFFECTIVE_COERCE), 
+                   LIKELY_ln = log(LIKELY_COERCE))
+
+par(mfrow = c(4, 2))
+par(mar=c(1,1,1,1))
+hist(dat$YOST_Wrong_ln)
+hist(dat$YOST_V_ln)
+hist(dat$PBC_ln)
+hist(dat$AWARE_ln)
+hist(dat$RCUS_ln) 
+hist(dat$LIKELY_ln)
+
+pred<-dat %>% dplyr::select(ASSERT, YOST_Wrong_ln, YOST_V_ln, YOST_LoT, YOST_RL, YR_PRACTICE, YR_COMMUN, COMMUN)
+consent<-dat %>% dplyr::select(ASSUME, POS, PBC_ln, RLN, IBA, AWARE_ln, RCUS_ln, LIKELY_ln)
+
+
+mvn(pred, mvnTest="mardia", univariateTest = c("SW"),desc=F) 
+mvn(consent, mvnTest="mardia", univariateTest = c("SW"),desc=F) 
+```
+
+```{r}
+mvn(pred, mvnTest="mardia", univariateTest = c("SW"),desc=F) 
+mvn(consent, mvnTest="mardia", univariateTest = c("SW"),desc=F,transform="log") 
+```
+
+# Multivariate regressions
+* Potential Confounders: AGE AGE_SEX PARTNERS ASSERT;  Hetero White Rel_1 Rel_2 (committed relationship as comparison group)
+* Predictors:  YOST (YOST_Wrong YOST_V YOST_LoT YOST_RL) YR_PRACTICE YR_COMMUN COMMUN
+* Factors:  Woman BDSM_2 BDSM_3
+* Outcomes: ASSUME POS PBC_ln RLN IBA AWARE_ln RCUS_ln EFFECTIVE_ln LIKELY_ln
+
+## Stepwise Regression
+```{r}
+update_y.formula <- function(depvar, fm) {
+  as.formula(paste0(depvar, " ~ ", paste(all.vars(fm)[-1], collapse=" + ")))
+}
+step1 <- function(depvar, orig_fm){
+  fm <- update_y.formula(depvar, orig_fm)
+  step(lm(fm, data=dat))
+}
+
+depvars <- c("ASSUME", "POS", "PBC_ln", "RLN", "IBA", "AWARE_ln", "RCUS_ln", "EFFECTIVE_ln", "LIKELY_ln")
+fm <- ASSUME ~ AGE_SEX  +ASSERT+ YOST_Wrong_ln +YOST_V_ln +YOST_LoT +YOST_RL+ YR_PRACTICE +YR_COMMUN+ COMMUN + Gender_2+Gender_3 + BDSM_2+ BDSM_3
+res <- lapply(depvars, step1, orig_fm=fm)
+```
+
+### Stepwise Results
+```{r}
+lapply(res, function(x) summary(x))
+knitr::kable(lapply(res, function(x) lm.beta(x)))
+```
+
+1) ASSUME: YOST_V_ln, YOST_RL, -COMMUN, -Woman, BDSM_3
+2) POS: -YOST_V_ln, Commun
+3) PBC_ln:  Assert, YOST_V_ln, -Yost_LoT, -Commun
+4) RLN: YOST_V_ln, Yost_RL
+5) IBA: -Partners, -Assert, YOST_V_ln, -Commun, BDMS_2, BDSM_3
+6) AWARE_ln: -Assert, YR_Practice, Commun, Woman
+7) RCUS_ln: -Age_sex, Assert, YOST_V_ln, Yost_Rl, Woman
+8) EFFECTIVE_ln:  YOST_Wrong_ln, Yost_RL, -YR_Commun, -BDSM_2, -BDSM_3
+9) LIKELY_ln: -Age_sex, Parners, YOST_V_ln, Yost_RL, -Commun, -BDSM_2
+
+### Additive models
+```{r}
+#define intercept-only model
+mlm1<-lm(cbind( ASSUME, POS, PBC_ln, RLN, IBA, AWARE_ln, RCUS_ln, EFFECTIVE_ln, LIKELY_ln) ~ 1, data = dat)
+mlm2 <- update(mlm1, . ~ . + AGE_SEX+ ASSERT)
+mlm3 <- update(mlm2, . ~ . + Gender_2+Gender_3+ BDSM_2+ BDSM_3 +Hetero)
+mlm4 <- update(mlm3, . ~ . + YOST_Wrong_ln +YOST_V_ln +YOST_LoT +YOST_RL)
+mlm5 <- update(mlm4, . ~ . + YR_PRACTICE +YR_COMMUN+ COMMUN)
+anova(mlm1, mlm2,mlm3,mlm4,mlm5)
+```
+
+### Adding confounders last
+```{r}
+mlm1<-lm(cbind( ASSUME, POS, PBC_ln, RLN, IBA, AWARE_ln, RCUS_ln, EFFECTIVE_ln, LIKELY_ln) ~ 1, data = dat)
+mlm2 <- update(mlm1, . ~ . + YOST_Wrong_ln +YOST_V_ln +YOST_LoT +YOST_RL)
+mlm3 <- update(mlm2, . ~ . + YR_PRACTICE +YR_COMMUN+ COMMUN)
+mlm4 <- update(mlm3, . ~ . + Gender_2+Gender_3+ BDSM_2+ BDSM_3+Hetero)
+mlm5 <- update(mlm4, . ~ . + AGE_SEX + ASSERT)
+anova(mlm1, mlm2,mlm3,mlm4,mlm5)
+```
+
+### Subtractive
+```{r}
+mlm1 <- lm(cbind( ASSUME, POS, PBC_ln, RLN, IBA, AWARE_ln, RCUS_ln, EFFECTIVE_ln, LIKELY_ln)  ~ AGE_SEX +ASSERT+
+    YOST_Wrong_ln +YOST_V_ln +YOST_LoT +YOST_RL+ YR_PRACTICE +YR_COMMUN+ COMMUN +
+     Gender_2+Gender_3+ BDSM_2+ BDSM_3, data=dat)
+
+mlm2 <- update(mlm1, . ~ . - AGE_SEX - ASSERT)
+mlm3 <- update(mlm2, . ~ . - Gender_2 - Gender_3- BDSM_2- BDSM_3-Hetero)
+mlm4 <- update(mlm3, . ~ . - YOST_Wrong_ln -YOST_V_ln -YOST_LoT -YOST_RL- YR_PRACTICE )
+anova(mlm1, mlm2,mlm3,mlm4)
+```

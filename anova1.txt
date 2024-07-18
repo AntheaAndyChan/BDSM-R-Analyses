@@ -1,0 +1,17 @@
+Analysis of Variance Table
+
+Model 1: cbind(POS, RLN, LIKELY_ln) ~ 1
+Model 2: cbind(POS, RLN, LIKELY_ln) ~ Gender + BDSMRole + Hetero
+Model 3: cbind(POS, RLN, LIKELY_ln) ~ Gender + BDSMRole + Hetero + YR_PRACTICE + 
+    YR_COMMUN
+Model 4: cbind(POS, RLN, LIKELY_ln) ~ Gender + BDSMRole + Hetero + YR_PRACTICE + 
+    YR_COMMUN + COMM_Positive + COMM_Communicate + COMM_Growth
+Model 5: cbind(POS, RLN, LIKELY_ln) ~ Gender + BDSMRole + Hetero + YR_PRACTICE + 
+    YR_COMMUN + COMM_Positive + COMM_Communicate + COMM_Growth + 
+    YOST_Wrong_ln + YOST_V_ln + YOST_LoT
+  Res.Df Df Gen.var. Pillai approx F num Df den Df Pr(>F)
+1    214           3                                     
+2    210 -4        2      3        3     12    606      2
+3    208 -2        3      1        1      6    402      4
+4    205 -3        2      2        2      9    606      3
+5    202 -3        1      4        4      9    606      1

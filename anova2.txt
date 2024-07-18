@@ -1,0 +1,15 @@
+Analysis of Variance Table
+
+Model 1: cbind(ASSERT, ASSUME, POS, PBC_ln, RLN, IBA, AWARE_ln, RCUS_ln,     LIKELY_ln) ~ 1
+Model 2: cbind(ASSERT, ASSUME, POS, PBC_ln, RLN, IBA, AWARE_ln, RCUS_ln,     LIKELY_ln) ~ Gender + BDSMRole
+Model 3: cbind(ASSERT, ASSUME, POS, PBC_ln, RLN, IBA, AWARE_ln, RCUS_ln,     LIKELY_ln) ~ Gender + BDSMRole + Hetero
+Model 4: cbind(ASSERT, ASSUME, POS, PBC_ln, RLN, IBA, AWARE_ln, RCUS_ln,     LIKELY_ln) ~ Gender + BDSMRole + Hetero + YR_PRACTICE + YR_COMMUN
+Model 5: cbind(ASSERT, ASSUME, POS, PBC_ln, RLN, IBA, AWARE_ln, RCUS_ln,     LIKELY_ln) ~ Gender + BDSMRole + Hetero + YR_PRACTICE + YR_COMMUN +     COMM_Positive + COMM_Communicate + COMM_Growth
+  Res.Df Df Gen.var. Pillai approx F num Df den Df     Pr(>F)    
+1    214       0.264                                             
+2    211 -3    0.257  0.373     3.14     27    597 0.00000028 ***
+3    210 -1    0.254  0.121     3.02      9    197     0.0021 ** 
+4    208 -2    0.254  0.100     1.16     18    396     0.2954    
+5    205 -3    0.251  0.225     1.79     27    597     0.0088 ** 
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1

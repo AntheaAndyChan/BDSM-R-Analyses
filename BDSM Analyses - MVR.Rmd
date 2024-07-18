@@ -1,0 +1,492 @@
+---
+title: "BDSM Analyses"
+author: "Andy Chan"
+date: "`r Sys.Date()`" 
+output: 
+  html_document: 
+    code_folding: hide 
+    theme: darkly
+--- 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(haven)
+library(tidyverse) 
+library(naniar) # missingness
+library(car) # for Anova()
+library(MVN) # Multivariate normality  
+library(QuantPsyc) # Multivariate normality  
+library(broom)
+library(ggplot2)
+library(GGally)
+library(CCA)
+library(CCP)
+
+# Useful settings
+options(digits = 3)
+options(scipen = 9999) # suppress scientific notation
+
+rm(list = ls()) 
+dat<- readRDS("Final Cleaned Kink2.rds")
+dat<-dat%>% dplyr::select(-COMMUNITY_1:-COMMUNITY_6)
+# Get number of missings per variable (n and %)
+miss_var_summary(dat)
+dat <- dat[complete.cases(dat),] #197 cases remain
+# 
+# pred<-dat %>% dplyr::select(Women, Bottom, Switch, Hetero, ASSERT, YOST_Wrong_ln, YOST_V_ln, YOST_LoT, YOST_RL, YR_PRACTICE, YR_COMMUN, COMMUN)
+# consent<-dat %>% dplyr::select(ASSUME, POS, PBC_ln, RLN, IBA, AWARE_ln, RCUS_ln, LIKELY_ln)
+
+```
+Not enough sample size to look at enbys, especially when we do interaction
+
+```{r}
+table(dat$Gender)
+table(dat$BDSMRole)
+table(dat$Gender,dat$BDSMRole)
+```
+
+
+Additive models
+
+* Potential Confounders: AGE AGE_SEX PARTNERS ASSERT;  Hetero White Rel_1 Rel_2 (committed relationship as comparison group)
+* Predictors:  YOST (YOST_Wrong YOST_V YOST_LoT YOST_RL) YR_PRACTICE YR_COMMUN COMMUN
+* Factors:  Woman BDSM_2 BDSM_3
+* Outcomes: ASSUME POS PBC_ln RLN IBA AWARE_ln RCUS_ln EFFECTIVE_ln LIKELY_ln
+
+1. Controls: AGE AGE_SEX PARTNERS ASSERT Hetero White Rel_1 Rel_2 
+2. Gender_1 Gender_3 BDSM_2 BDSM_3
+3. Gender x Role Interaction
+4. BDSM Attitudes: YOST (YOST_Wrong YOST_V YOST_LoT YOST_RL) 
+5. BDSM Community: YR_PRACTICE YR_COMMUN COMMUN
+
+Multivariate Outcomes: ASSUME POS PBC_ln RLN IBA AWARE_ln RCUS_ln EFFECTIVE_ln LIKELY_ln
+
+# With Assert 
+intercept-only model
+```{r}
+mlm1<-lm(cbind( ASSUME, POS, PBC_ln, RLN, IBA, AWARE_ln, RCUS_ln, LIKELY_ln) ~ 1, data = dat)
+# summary(mlm1)
+```
+removed effectiveness 
+
+add controls
+```{r}
+mlm2 <- update(mlm1, . ~ . + ASSERT)
+
+anova(mlm1, mlm2)
+# summary(mlm2)
+```
+
+add main demographic factors
+```{r}
+
+mlm3a <- update(mlm2, . ~ .  +Hetero)
+anova(mlm2, mlm3a)
+```
+
+```{r}
+mlm3b <- update(mlm3a, . ~ . + Gender+BDSMRole)
+anova(mlm3a, mlm3b)
+# summary(mlm3)
+```
+
+add interaction term
+```{r}
+mlm3c <- update(mlm3b, . ~ . + Gender*BDSMRole)
+anova(mlm3b, mlm3c)
+# summary(mlm3a)
+```
+
+did not significantly improve model so let's remove interaction
+```{r}
+mlm3d <- update(mlm3c, . ~ . -Gender*BDSMRole + Gender+BDSMRole)
+anova(mlm3c, mlm3d)
+```
+
+add bdsm attitudes variables
+```{r}
+mlm4 <- update(mlm3d, . ~ . + YOST_Wrong_ln +YOST_V_ln +YOST_LoT +YOST_RL)
+anova(mlm3d, mlm4)
+# summary(mlm4)
+```
+
+add bdsm community variables
+```{r}
+mlm5 <- update(mlm4, . ~ . +COMMUN )
+anova(mlm4, mlm5)
+```
+adding years practice does not improve much
+
+```{r}
+mlm6 <- update(mlm5, . ~ . +YR_COMMUN +YR_PRACTICE  )
+anova(mlm5, mlm6)
+```
+
+
+
+No
+
+
+# Without Assert 
+intercept-only model
+```{r}
+mlm1<-lm(cbind( ASSUME, POS, PBC_ln, RLN, IBA, AWARE_ln, RCUS_ln, LIKELY_ln) ~ 1, data = dat)
+# summary(mlm1)
+```
+removed effectiveness 
+
+add main demographic factors
+
+```{r}
+mlm2 <- update(mlm1, . ~ . + Gender+BDSMRole)
+anova(mlm1, mlm2)
+
+
+mlm1a <- update(mlm2, . ~ . + Gender:BDSMRole)
+anova(mlm2, mlm1a)
+
+# summary(mlm3)
+```
+did not significantly improve model so let's remove interaction,
+
+```{r}
+
+mlm3 <- update(mlm2, . ~ .  +Hetero)
+anova(mlm2, mlm3)
+```
+
+
+add bdsm attitudes variables
+```{r}
+mlm4 <- update(mlm3, . ~ . + YOST_Wrong_ln +YOST_V_ln +YOST_LoT +YOST_RL)
+anova(mlm3, mlm4)
+# summary(mlm4)
+
+```
+
+
+
+```{r}
+mlm5a <- update(mlm4, . ~ . +YR_PRACTICE)
+anova(mlm4, mlm5a)
+
+mlm5b <- update(mlm4, . ~ . +YR_COMMUN)
+anova(mlm4,mlm5b)
+
+
+mlm5a <- update(mlm4, . ~ . +YR_PRACTICE+YR_COMMUN)
+anova(mlm4, mlm5a)
+ 
+```
+
+
+add bdsm community variables
+```{r}
+mlm6 <- update(mlm5a, . ~ . +COMMUN )
+anova(mlm5, mlm6)
+
+summary(mlm6)
+
+
+mlm5 <- update(mlm4, . ~ . +COMMUN )
+anova(mlm4, mlm5)
+
+summary(mlm5)
+```
+ 
+```{r}
+
+
+mlm6 <- update(mlm5, . ~ . +ASSERT )
+anova(mlm5, mlm6)
+
+summary(mlm6)
+
+```
+
+# Go back and remove Yost
+
+```{r}
+mlm5a <- update(mlm3, . ~ . +YR_PRACTICE)
+anova(mlm3, mlm5a)
+
+mlm5b <- update(mlm3, . ~ . +YR_COMMUN)
+anova(mlm3,mlm5b)
+
+
+mlm5a <- update(mlm3, . ~ . +YR_PRACTICE+YR_COMMUN)
+anova(mlm3, mlm5a)
+ 
+```
+
+
+add bdsm community variables
+```{r}
+mlm5 <- update(mlm3, . ~ . +COMMUN )
+anova(mlm3, mlm5)
+
+# summary(mlm5)
+```
+ 
+```{r}
+mlm6 <- update(mlm5, . ~ . +ASSERT )
+anova(mlm5, mlm6)
+
+summary(mlm6)
+```
+
+No
+
+# A matter of curiosity, does BDSM predict Assertiveness?
+```{r}
+mlm1<-lm(ASSERT ~ 1, data = dat)
+mlm2 <- update(mlm1, . ~ . + Gender+BDSMRole)
+anova(mlm1, mlm2)
+mlm1a <- update(mlm2, . ~ . + Gender:BDSMRole)
+anova(mlm2, mlm1a)
+
+mlm3 <- update(mlm2, . ~ .  +Hetero)
+anova(mlm2, mlm3)
+mlm5a <- update(mlm3, . ~ . +YR_PRACTICE+YR_COMMUN)
+anova(mlm3, mlm5a)
+ 
+mlm6 <- update(mlm5a, . ~ . +COMMUN )
+anova(mlm5a, mlm6)
+
+summary(mlm6)
+```
+ 
+ 
+# A matter of curiosity, relationships with Yost?
+```{r}
+mlm1<-lm(cbind(YOST_Wrong_ln ,YOST_V_ln ,YOST_LoT ,YOST_RL) ~ 
+           Gender*BDSMRole +Hetero +YR_PRACTICE+YR_COMMUN +COMMUN , data = dat)
+summary(mlm1)
+```
+
+# Assertiveness as an outcome
+
+add main demographic factors
+```{r}
+mlm1<-lm(cbind(ASSERT, ASSUME, POS, PBC_ln, RLN, IBA, AWARE_ln, RCUS_ln, LIKELY_ln) ~ 1, data = dat)
+mlm2 <- update(mlm1, . ~ . + Gender+BDSMRole)
+anova(mlm1, mlm2)
+
+mlm1a <- update(mlm2, . ~ . + Gender:BDSMRole)
+anova(mlm2, mlm1a)
+
+# did not significantly improve model so let's remove interaction,
+
+mlm3 <- update(mlm2, . ~ .  +Hetero)
+anova(mlm2, mlm3)
+
+mlm5a <- update(mlm3, . ~ . +YR_PRACTICE+YR_COMMUN)
+anova(mlm3, mlm5a)
+
+mlm6 <- update(mlm5a, . ~ . +COMMUN )
+anova(mlm5a, mlm6)
+```
+
+
+```{r}
+summary(mlm6)
+```
+
+## Adding Yost back in
+```{r}
+mlm6a <- update(mlm6, . ~ . + YOST_Wrong_ln +YOST_V_ln +YOST_LoT +YOST_RL)
+anova(mlm6, mlm6a)
+
+summary(mlm6a)
+```
+
+
+
+# Anova results exportt
+```{r} 
+ANOVA<-anova(mlm1,mlm2,mlm3,mlm5a,mlm6,mlm6a,mlm6b)
+sink("anova.txt");print(ANOVA);sink()
+results<-summary(mlm6a) 
+coefs<-tidy(mlm6a)
+
+
+mlm<-lm(cbind(scale(ASSERT),scale(ASSUME), scale(POS), scale(PBC_ln), scale(RLN), scale(IBA), scale(AWARE_ln), scale(RCUS_ln), scale(LIKELY_ln)) ~   Hetero + Gender + BDSMRole + scale(YOST_Wrong_ln) + scale(YOST_V_ln) + scale(YOST_LoT) + scale(YOST_RL) + scale(COMMUN) + scale(YR_PRACTICE) + scale(YR_COMMUN), data=dat)
+std.coefs<-tidy(mlm)$estimate
+
+coefs<-cbind(std.coefs=std.coefs, coefs)  %>% 
+    mutate(coef=paste(round(estimate,2),"(",round(std.error,2),")",sep=""),
+           sig = case_when(p.value<.001 ~ "***",
+                           p.value<.01 ~ "**",
+                           p.value<.05 ~ "*",
+                           T~""),
+           beta=paste(round(std.coefs,2),sig,sep=""))%>% 
+    dplyr::select(response,term,coef,beta, estimate, std.error,std.coefs, statistic,p.value)
+
+
+table<-cbind("adj.r.squared","f","numdf","dendf")
+for (i in 1:9){ 
+    table<-rbind(table,
+                 cbind(round(results[[i]]$adj.r.squared,3), 
+                       round(results[[i]]$fstatistic[1],3), 
+                       round(results[[i]]$fstatistic[2],3), 
+                       round(results[[i]]$fstatistic[3],3))
+    )
+}
+colnames(table)<-table[1,]
+table<-table[-1,]
+table<-as.data.frame(table)
+table[,1]<-as.numeric(table[,1])
+table[,2]<-as.numeric(table[,2])
+table[,3]<-as.numeric(table[,3])
+table[,4]<-as.numeric(table[,4])
+table$p <- pf(table[,2],table[,3],table[,4],lower.tail=F)
+
+table<-table %>% 
+    mutate(sig= case_when(p<.001 ~ "p<.001",T~paste("p=",round(p,3))),
+            Ftest=paste("F(",numdf,", ", dendf,") = ", f, ", ",sig,sep="")
+    ) %>% dplyr::select(adj.r.squared,Ftest)
+            
+
+library(openxlsx)
+BDSMResults <- createWorkbook("BDSMResults") 
+addWorksheet(BDSMResults, "ANOVAs")
+writeData(BDSMResults, sheet = 1, ANOVA) 
+addWorksheet(BDSMResults, "coefficients")
+writeData(BDSMResults, sheet = 2, coefs) 
+addWorksheet(BDSMResults, "modela")
+writeData(BDSMResults, sheet = 3, table) 
+saveWorkbook(BDSMResults, "MVR Results_242024.xlsx", overwrite = TRUE) 
+ 
+```
+
+```{r}
+variables<-dat %>% dplyr::select(ASSERT, ASSUME, POS, PBC_ln, RLN, IBA, AWARE_ln, RCUS_ln, LIKELY_ln,
+                YOST_Wrong_ln ,YOST_V_ln ,YOST_LoT ,YOST_RL, YR_PRACTICE,YR_COMMUN ,COMMUN )
+    # library('apaTables')
+
+# Use apa.cor.table function
+apa.cor.table(variables)
+apa.cor.table(variables, show.conf.interval = F, filename="CorTable1.doc")
+
+
+apa.reg.table(mlm6a)
+```
+
+
+# Export no yost
+```{r} 
+results<-summary(mlm6) 
+coefs<-tidy(mlm6)
+
+
+mlm<-lm(cbind(scale(ASSERT),scale(ASSUME), scale(POS), scale(PBC_ln), scale(RLN), scale(IBA), scale(AWARE_ln), scale(RCUS_ln), scale(LIKELY_ln)) ~   Hetero + Gender + BDSMRole+ scale(COMMUN) + scale(YR_PRACTICE) + scale(YR_COMMUN), data=dat)
+std.coefs<-tidy(mlm)$estimate
+
+coefs<-cbind(std.coefs=std.coefs, coefs)  %>% 
+    mutate(coef=paste(round(estimate,2),"(",round(std.error,2),")",sep=""),
+           sig = case_when(p.value<.001 ~ "***",
+                           p.value<.01 ~ "**",
+                           p.value<.05 ~ "*",
+                           T~""),
+           beta=paste(round(std.coefs,2),sig,sep=""))%>% 
+    dplyr::select(response,term,coef,beta, estimate, std.error,std.coefs, statistic,p.value)
+
+
+table<-cbind("adj.r.squared","f","numdf","dendf")
+for (i in 1:9){ 
+    table<-rbind(table,
+                 cbind(round(results[[i]]$adj.r.squared,3), 
+                       round(results[[i]]$fstatistic[1],3), 
+                       round(results[[i]]$fstatistic[2],3), 
+                       round(results[[i]]$fstatistic[3],3))
+    )
+}
+colnames(table)<-table[1,]
+table<-table[-1,]
+table<-as.data.frame(table)
+table[,1]<-as.numeric(table[,1])
+table[,2]<-as.numeric(table[,2])
+table[,3]<-as.numeric(table[,3])
+table[,4]<-as.numeric(table[,4])
+table$p <- pf(table[,2],table[,3],table[,4],lower.tail=F)
+
+table<-table %>% 
+    mutate(sig= case_when(p<.001 ~ "p<.001",T~paste("p=",round(p,3))),
+            Ftest=paste("F(",numdf,", ", dendf,") = ", f, ", ",sig,sep="")
+    ) %>% dplyr::select(adj.r.squared,Ftest)
+            
+
+library(openxlsx)
+BDSMResults <- createWorkbook("BDSMResults") 
+addWorksheet(BDSMResults, "ANOVAs")
+writeData(BDSMResults, sheet = 1, ANOVA) 
+addWorksheet(BDSMResults, "coefficients")
+writeData(BDSMResults, sheet = 2, coefs) 
+addWorksheet(BDSMResults, "modela")
+writeData(BDSMResults, sheet = 3, table) 
+saveWorkbook(BDSMResults, "MVR Results_noyost_242024.xlsx", overwrite = TRUE) 
+ 
+```
+
+
+
+# No Years
+```{r} 
+
+mlm6b <- update(mlm6, . ~ . -YR_PRACTICE-YR_COMMUN)
+anova(mlm6b)
+
+
+results<-summary(mlm6b) 
+coefs<-tidy(mlm6b)
+
+
+mlm<-lm(cbind(scale(ASSERT),scale(ASSUME), scale(POS), scale(PBC_ln), scale(RLN), scale(IBA), scale(AWARE_ln), scale(RCUS_ln), scale(LIKELY_ln)) ~   Hetero + Gender + BDSMRole+ scale(COMMUN) , data=dat)
+std.coefs<-tidy(mlm)$estimate
+
+coefs<-cbind(std.coefs=std.coefs, coefs)  %>% 
+    mutate(coef=paste(round(estimate,2),"(",round(std.error,2),")",sep=""),
+           sig = case_when(p.value<.001 ~ "***",
+                           p.value<.01 ~ "**",
+                           p.value<.05 ~ "*",
+                           T~""),
+           beta=paste(round(std.coefs,2),sig,sep=""))%>% 
+    dplyr::select(response,term,coef,beta, estimate, std.error,std.coefs, statistic,p.value)
+
+
+table<-cbind("adj.r.squared","f","numdf","dendf")
+for (i in 1:9){ 
+    table<-rbind(table,
+                 cbind(round(results[[i]]$adj.r.squared,3), 
+                       round(results[[i]]$fstatistic[1],3), 
+                       round(results[[i]]$fstatistic[2],3), 
+                       round(results[[i]]$fstatistic[3],3))
+    )
+}
+colnames(table)<-table[1,]
+table<-table[-1,]
+table<-as.data.frame(table)
+table[,1]<-as.numeric(table[,1])
+table[,2]<-as.numeric(table[,2])
+table[,3]<-as.numeric(table[,3])
+table[,4]<-as.numeric(table[,4])
+table$p <- pf(table[,2],table[,3],table[,4],lower.tail=F)
+
+table<-table %>% 
+    mutate(sig= case_when(p<.001 ~ "p<.001",T~paste("p=",round(p,3))),
+            Ftest=paste("F(",numdf,", ", dendf,") = ", f, ", ",sig,sep="")
+    ) %>% dplyr::select(adj.r.squared,Ftest)
+            
+
+library(openxlsx)
+BDSMResults <- createWorkbook("BDSMResults") 
+addWorksheet(BDSMResults, "ANOVAs")
+writeData(BDSMResults, sheet = 1, ANOVA) 
+addWorksheet(BDSMResults, "coefficients")
+writeData(BDSMResults, sheet = 2, coefs) 
+addWorksheet(BDSMResults, "modela")
+writeData(BDSMResults, sheet = 3, table) 
+saveWorkbook(BDSMResults, "MVR Results_noyostnoyears_242024.xlsx", overwrite = TRUE) 
+ 
+```
+
